@@ -62,7 +62,7 @@ def handler(request):
 
     with subscriber:
         try:
-            streaming_pull_future.result(timeout=9)
+            streaming_pull_future.result(timeout=15)
         except TimeoutError:
             streaming_pull_future.cancel()
         except Exception:
