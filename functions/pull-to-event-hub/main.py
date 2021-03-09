@@ -1,24 +1,22 @@
-import os
 import json
-import utils
 import logging
-
-from google.cloud import pubsub_v1
+import os
 from concurrent.futures import TimeoutError
-from azure.eventhub import EventHubProducerClient, EventData
+
+import utils
+from azure.eventhub import EventData, EventHubProducerClient
+from google.cloud import pubsub_v1
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger('google.cloud.pubsub_v1').setLevel(logging.WARNING)
+logging.getLogger("google.cloud.pubsub_v1").setLevel(logging.WARNING)
 
 
 event_hub_connection_string = utils.get_secret(
-    os.environ['PROJECT_ID'],
-    os.environ['CONNECTION_SECRET']
+    os.environ["PROJECT_ID"], os.environ["CONNECTION_SECRET"]
 )
 
 event_hub_name = utils.get_secret(
-    os.environ['PROJECT_ID'],
-    os.environ['EVENTHUB_SECRET']
+    os.environ["PROJECT_ID"], os.environ["EVENTHUB_SECRET"]
 )
 
 
@@ -35,7 +33,7 @@ def handler(request):
 
         event = {
             "message": msg.data.decode(),
-            "subscription": subscription_path.split("/")[-1]
+            "subscription": subscription_path.split("/")[-1],
         }
 
         batch = producer.create_batch()
@@ -45,29 +43,29 @@ def handler(request):
 
         msg.ack()
 
-    subscription_path = request.data.decode('utf-8')
+    subscription_path = request.data.decode("utf-8")
 
     logging.info("Creating Azure producer...")
     producer = EventHubProducerClient.from_connection_string(
-           conn_str=event_hub_connection_string,
-           eventhub_name=event_hub_name)
+        conn_str=event_hub_connection_string, eventhub_name=event_hub_name
+    )
 
     logging.info("Creating GCP subscriber...")
     subscriber = pubsub_v1.SubscriberClient()
-    streaming_pull_future = subscriber.subscribe(
-        subscription_path,
-        callback=callback)
+    streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
 
     logging.info(f"Listening for messages on {subscription_path}...")
 
     with subscriber:
         try:
-            streaming_pull_future.result(timeout=9)
+            streaming_pull_future.result(timeout=15)
         except TimeoutError:
             streaming_pull_future.cancel()
         except Exception:
-            logging.exception(f"Listening for messages on {subscription_path} threw an exception.")
+            logging.exception(
+                f"Listening for messages on {subscription_path} threw an exception."
+            )
         finally:
             producer.close()
 
-    return 'OK', 204
+    return "OK", 204
