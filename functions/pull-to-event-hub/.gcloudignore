@@ -1,0 +1,8 @@
+.gcloudignore
+.git
+.gitignore
+
+requirements.unexpanded.txt
+README.md
+schedule.sh
+deploy.sh
