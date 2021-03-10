@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import time
 from concurrent.futures import TimeoutError
+from datetime import datetime
 
 import utils
 from azure.eventhub import EventData, EventHubProducerClient
@@ -19,17 +21,24 @@ event_hub_name = utils.get_secret(
     os.environ["PROJECT_ID"], os.environ["EVENTHUB_SECRET"]
 )
 
+FUNCTION_TIMEOUT = int(os.getenv("FUNCTION_TIMEOUT", "500"))
 
-def handler(request):
+
+def pull_to_event_hub(request):
+
     """
     Handler function that subscribes to gcp pub/sub
     and sends messages to azure event hub.
     """
 
+    last_message_received_time = datetime.now()
+
     def callback(msg):
         """
         Callback function for pub/sub subscriber.
         """
+
+        last_message_received_time = datetime.now()  # noqa: F841
 
         event = {
             "message": msg.data.decode(),
@@ -52,20 +61,38 @@ def handler(request):
 
     logging.info("Creating GCP subscriber...")
     subscriber = pubsub_v1.SubscriberClient()
-    streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
+    streaming_pull_future = subscriber.subscribe(
+        subscription_path,
+        callback=callback,
+        flow_control=pubsub_v1.types.FlowControl(max_messages=5),
+    )
 
     logging.info(f"Listening for messages on {subscription_path}...")
 
-    with subscriber:
-        try:
-            streaming_pull_future.result(timeout=15)
-        except TimeoutError:
-            streaming_pull_future.cancel()
-        except Exception:
-            logging.exception(
-                f"Listening for messages on {subscription_path} threw an exception."
-            )
-        finally:
-            producer.close()
+    start = datetime.now()
+
+    try:
+        while True:
+
+            # limit the duration of the function
+            if (datetime.now() - start).total_seconds() > FUNCTION_TIMEOUT:
+                streaming_pull_future.cancel(await_msg_callbacks=True)
+                break
+
+            # assume there are no more messages
+            if (datetime.now() - last_message_received_time).total_seconds() > 2:
+                streaming_pull_future.cancel(await_msg_callbacks=True)
+                break
+
+            time.sleep(1)
+
+    except TimeoutError:
+        streaming_pull_future.cancel(await_msg_callbacks=True)
+    except Exception:
+        logging.exception(
+            f"Listening for messages on {subscription_path} threw an exception."
+        )
+    finally:
+        producer.close()
 
     return "OK", 204
