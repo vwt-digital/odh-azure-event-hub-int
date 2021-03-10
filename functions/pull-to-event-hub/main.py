@@ -36,7 +36,8 @@ def pull_to_event_hub(request):
         Callback function for pub/sub subscriber.
         """
 
-        last_message_received_time = datetime.now()  # noqa: F841
+        nonlocal last_message_received_time
+        last_message_received_time = datetime.now()
 
         event = {
             "message": msg.data.decode(),
@@ -73,15 +74,13 @@ def pull_to_event_hub(request):
     try:
         while True:
 
-            print(last_message_received_time)
-
             # limit the duration of the function
             if (datetime.now() - start).total_seconds() > FUNCTION_TIMEOUT:
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
             # assume there are no more messages
-            if (datetime.now() - last_message_received_time).total_seconds() > 5:
+            if (datetime.now() - last_message_received_time).total_seconds() > 2:
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
