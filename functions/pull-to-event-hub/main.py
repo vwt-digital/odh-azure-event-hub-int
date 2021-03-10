@@ -31,8 +31,6 @@ def pull_to_event_hub(request):
     and sends messages to azure event hub.
     """
 
-    last_message_received_time = datetime.now()
-
     def callback(msg):
         """
         Callback function for pub/sub subscriber.
@@ -70,9 +68,12 @@ def pull_to_event_hub(request):
     logging.info(f"Listening for messages on {subscription_path}...")
 
     start = datetime.now()
+    last_message_received_time = start
 
     try:
         while True:
+
+            print(last_message_received_time)
 
             # limit the duration of the function
             if (datetime.now() - start).total_seconds() > FUNCTION_TIMEOUT:
@@ -80,11 +81,11 @@ def pull_to_event_hub(request):
                 break
 
             # assume there are no more messages
-            if (datetime.now() - last_message_received_time).total_seconds() > 2:
+            if (datetime.now() - last_message_received_time).total_seconds() > 5:
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
-            time.sleep(1)
+            time.sleep(0.5)
 
     except TimeoutError:
         streaming_pull_future.cancel(await_msg_callbacks=True)
