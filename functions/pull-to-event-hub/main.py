@@ -64,7 +64,7 @@ def pull_to_event_hub(request):
     streaming_pull_future = subscriber.subscribe(
         subscription_path,
         callback=callback,
-        flow_control=pubsub_v1.types.FlowControl(max_messages=5),
+        flow_control=pubsub_v1.types.FlowControl(max_messages=25),
     )
 
     logging.info(f"Listening for messages on {subscription_path}...")
