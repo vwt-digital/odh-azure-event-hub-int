@@ -94,5 +94,6 @@ def pull_to_event_hub(request):
         )
     finally:
         producer.close()
+        subscriber.close()
 
     return "OK", 204
