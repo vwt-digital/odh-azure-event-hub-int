@@ -63,7 +63,7 @@ def pull_to_event_hub(request):
     streaming_pull_future = subscriber.subscribe(
         subscription_path,
         callback=callback,
-        flow_control=pubsub_v1.types.FlowControl(max_messages=10),
+        flow_control=pubsub_v1.types.FlowControl(max_messages=5),
     )
 
     logging.info(f"Listening for messages on {subscription_path}...")
@@ -80,7 +80,7 @@ def pull_to_event_hub(request):
                 break
 
             # assume there are no more messages
-            if (datetime.now() - last_message_received_time).total_seconds() > 2:
+            if (datetime.now() - last_message_received_time).total_seconds() > 3:
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
