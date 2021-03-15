@@ -98,10 +98,11 @@ def pull_to_event_hub(request):
         producer.close()
         subscriber.close()
 
-    logging.info(
-        "Sent {} messages from {} to Azure Eventhub".format(
-            handled_messages, subscription_path
+    if handled_messages > 0:
+        logging.info(
+            "Sent {} messages from {} to Azure Eventhub".format(
+                handled_messages, subscription_path
+            )
         )
-    )
 
     return "OK", 204
