@@ -31,6 +31,8 @@ def pull_to_event_hub(request):
     and sends messages to azure event hub.
     """
 
+    handled_messages = 0
+
     def callback(msg):
         """
         Callback function for pub/sub subscriber.
@@ -39,6 +41,9 @@ def pull_to_event_hub(request):
         nonlocal last_message_received_time
         last_message_received_time = datetime.now()
 
+        nonlocal handled_messages
+        handled_messages = handled_messages + 1
+
         event = {
             "message": msg.data.decode(),
             "subscription": subscription_path.split("/")[-1],
@@ -46,19 +51,16 @@ def pull_to_event_hub(request):
 
         batch = producer.create_batch()
         batch.add(EventData(json.dumps(event)))
-        logging.info(f"Sending {batch.size_in_bytes} bytes of messages...")
         producer.send_batch(batch)
 
         msg.ack()
 
     subscription_path = request.data.decode("utf-8")
 
-    logging.info("Creating Azure producer...")
     producer = EventHubProducerClient.from_connection_string(
         conn_str=event_hub_connection_string, eventhub_name=event_hub_name
     )
 
-    logging.info("Creating GCP subscriber...")
     subscriber = pubsub_v1.SubscriberClient()
     streaming_pull_future = subscriber.subscribe(
         subscription_path,
@@ -80,7 +82,7 @@ def pull_to_event_hub(request):
                 break
 
             # assume there are no more messages
-            if (datetime.now() - last_message_received_time).total_seconds() > 3:
+            if (datetime.now() - last_message_received_time).total_seconds() > 2:
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
@@ -95,5 +97,11 @@ def pull_to_event_hub(request):
     finally:
         producer.close()
         subscriber.close()
+
+    logging.info(
+        "Sent {} messages from {} to Azure Eventhub".format(
+            handled_messages, subscription_path
+        )
+    )
 
     return "OK", 204
