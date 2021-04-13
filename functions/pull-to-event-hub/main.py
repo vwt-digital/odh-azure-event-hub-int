@@ -86,7 +86,7 @@ def pull_to_event_hub(request):
                 streaming_pull_future.cancel(await_msg_callbacks=True)
                 break
 
-            time.sleep(0.5)
+            time.sleep(1)
 
     except TimeoutError:
         streaming_pull_future.cancel(await_msg_callbacks=True)
