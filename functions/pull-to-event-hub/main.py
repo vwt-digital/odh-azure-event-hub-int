@@ -65,6 +65,7 @@ def pull_to_event_hub(request):
     streaming_pull_future = subscriber.subscribe(
         subscription_path,
         callback=callback,
+        await_callbacks_on_shutdown=True,
         flow_control=pubsub_v1.types.FlowControl(max_messages=5),
     )
 
@@ -78,18 +79,18 @@ def pull_to_event_hub(request):
 
             # limit the duration of the function
             if (datetime.now() - start).total_seconds() > FUNCTION_TIMEOUT:
-                streaming_pull_future.cancel(await_msg_callbacks=True)
+                streaming_pull_future.cancel()
                 break
 
             # assume there are no more messages
             if (datetime.now() - last_message_received_time).total_seconds() > 2:
-                streaming_pull_future.cancel(await_msg_callbacks=True)
+                streaming_pull_future.cancel()
                 break
 
             time.sleep(1)
 
     except TimeoutError:
-        streaming_pull_future.cancel(await_msg_callbacks=True)
+        streaming_pull_future.cancel()
     except Exception:
         logging.exception(
             f"Listening for messages on {subscription_path} threw an exception."
