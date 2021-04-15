@@ -23,10 +23,10 @@ event_hub_name = utils.get_secret(
 
 FUNCTION_TIMEOUT = int(os.getenv("FUNCTION_TIMEOUT", "500"))
 
-global last_message_received_time
-global handled_messages
-global producer
-global subscription_path
+last_message_received_time = None
+handled_messages = None
+producer = None
+subscription_path = None
 
 
 def callback(msg):
