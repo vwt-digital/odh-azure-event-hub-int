@@ -23,6 +23,49 @@ event_hub_name = utils.get_secret(
 
 FUNCTION_TIMEOUT = int(os.getenv("FUNCTION_TIMEOUT", "500"))
 
+last_message_received_time = None
+handled_messages = None
+producer = None
+subscription_path = None
+
+
+def callback(msg):
+    """
+    Callback function for pub/sub subscriber.
+    """
+
+    global last_message_received_time
+    global handled_messages
+    global producer
+    global subscription_path
+
+    last_message_received_time = datetime.now()
+
+    handled_messages = handled_messages + 1
+
+    event = {
+        "message": msg.data.decode(),
+        "subscription": subscription_path.split("/")[-1],
+    }
+
+    try:
+        batch = producer.create_batch()
+        batch.add(EventData(json.dumps(event)))
+        producer.send_batch(batch)
+    except Exception as e:
+        logging.exception(
+            f"Sending message to Azure Eventhub on {subscription_path} threw an exception."
+        )
+        logging.exception(e)
+
+    try:
+        msg.ack()
+    except Exception as e:
+        logging.exception(
+            f"Acknowledge of message on {subscription_path} threw an exception."
+        )
+        logging.exception(e)
+
 
 def pull_to_event_hub(request):
 
@@ -31,29 +74,12 @@ def pull_to_event_hub(request):
     and sends messages to azure event hub.
     """
 
+    global last_message_received_time
+    global handled_messages
+    global producer
+    global subscription_path
+
     handled_messages = 0
-
-    def callback(msg):
-        """
-        Callback function for pub/sub subscriber.
-        """
-
-        nonlocal last_message_received_time
-        last_message_received_time = datetime.now()
-
-        nonlocal handled_messages
-        handled_messages = handled_messages + 1
-
-        event = {
-            "message": msg.data.decode(),
-            "subscription": subscription_path.split("/")[-1],
-        }
-
-        batch = producer.create_batch()
-        batch.add(EventData(json.dumps(event)))
-        producer.send_batch(batch)
-
-        msg.ack()
 
     subscription_path = request.data.decode("utf-8")
 
@@ -66,7 +92,7 @@ def pull_to_event_hub(request):
         subscription_path,
         callback=callback,
         await_callbacks_on_shutdown=True,
-        flow_control=pubsub_v1.types.FlowControl(max_messages=5),
+        flow_control=pubsub_v1.types.FlowControl(max_messages=10),
     )
 
     logging.info(f"Listening for messages on {subscription_path}...")
@@ -83,11 +109,11 @@ def pull_to_event_hub(request):
                 break
 
             # assume there are no more messages
-            if (datetime.now() - last_message_received_time).total_seconds() > 2:
+            if (datetime.now() - last_message_received_time).total_seconds() > 3:
                 streaming_pull_future.cancel()
                 break
 
-            time.sleep(1)
+            time.sleep(0.5)
 
     except TimeoutError:
         streaming_pull_future.cancel()
