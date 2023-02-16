@@ -28,4 +28,4 @@ typing-extensions==3.10.0.0
 typing-inspect==0.7.0
 uamqp==1.4.0
 urllib3==1.26.5
-Werkzeug==1.0.1
+Werkzeug==2.2.3
